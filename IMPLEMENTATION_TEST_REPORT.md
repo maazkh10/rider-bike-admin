@@ -70,3 +70,11 @@ The reference also documents that `/login` is currently protected by SecurityCon
 ## Security notes
 
 Do not put JWTs, KYC values, bank details or database credentials into source control, screenshots or logs. Use secure storage for mobile JWTs. The documented `sendJWT` fallback should be disabled once the backend `/login` configuration is intentionally made public and properly secured.
+
+
+## CI validation status — 26 October 2026
+
+- Added `.github/workflows/mobile-validation.yml` on `repair/ride-lifecycle-notifications-payments`.
+- The workflow is configured to install locked dependencies with `npm ci`, validate the public Expo config, and bundle the Admin app for Android and iOS.
+- GitHub Actions returned no workflow runs for the new workflow commit at the time this report was checked. Therefore the CI bundles have **not** been confirmed passing.
+- This environment could not clone the repositories or reach the deployed backend due unavailable outbound DNS/network access. No device-level, live backend, WebSocket, GPS, push-notification, or payment test is claimed as passed.

@@ -124,9 +124,9 @@ export const getNearbyRidersApi = async (
 // ==========================================
 // CALCULATE FARE
 // ==========================================
-// The reference explicitly says the current endpoint is a placeholder.
-// Use a numeric backend value when one is returned. Never invent a fare.
-
+// Never invent production prices with a random fallback. The backend currently
+// documents this endpoint as a placeholder, so stop and require an approved
+// server fare or a manually approved fare before the ride is created.
 export const calculateFareApi = async ({
   startLatitude,
   startLongitude,
@@ -143,142 +143,31 @@ export const calculateFareApi = async ({
   });
 
   const raw = response?.data;
-
   let fare = null;
   let distance = null;
 
-  // ==========================================
-  // 1. BACKEND RESPONSE IS A NUMBER
-  // ==========================================
-
   if (typeof raw === "number") {
     fare = raw;
+  } else if (typeof raw === "string") {
+    const fareMatch = raw.match(/(?:Total\\s*Fare|Fare)\\s*:\\s*₹?\\s*([0-9]+(?:\\.[0-9]+)?)/i);
+    const distanceMatch = raw.match(/Distance\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)/i);
+    if (fareMatch) fare = Number(fareMatch[1]);
+    if (distanceMatch) distance = Number(distanceMatch[1]);
+  } else if (raw && typeof raw === "object") {
+    const candidate = raw.fare ?? raw.totalFare ?? raw.amount ?? raw.estimatedFare;
+    fare = candidate == null ? null : Number(candidate);
+    const distanceCandidate = raw.distance ?? raw.distanceKm ?? raw.distanceInKm;
+    distance = distanceCandidate == null ? null : Number(distanceCandidate);
   }
-
-  // ==========================================
-  // 2. BACKEND RESPONSE IS A STRING
-  // ==========================================
-
-  else if (typeof raw === "string") {
-    const fareMatch = raw.match(
-      /(?:Total\s*Fare|Fare)\s*:\s*₹?\s*([0-9]+(?:\.[0-9]+)?)/i
-    );
-
-    const distanceMatch = raw.match(
-      /Distance\s*:\s*([0-9]+(?:\.[0-9]+)?)/i
-    );
-
-    if (fareMatch) {
-      fare = Number(fareMatch[1]);
-    }
-
-    if (distanceMatch) {
-      distance = Number(distanceMatch[1]);
-    }
-  }
-
-  // ==========================================
-  // 3. BACKEND RESPONSE IS AN OBJECT
-  // ==========================================
-
-  else if (raw && typeof raw === "object") {
-    fare = Number(
-      raw.fare ??
-      raw.totalFare ??
-      raw.amount ??
-      raw.estimatedFare
-    );
-
-    distance = Number(
-      raw.distance ??
-      raw.distanceKm ??
-      raw.distanceInKm
-    );
-  }
-
-  // ==========================================
-  // 4. TEMPORARY RANDOM FARE FALLBACK
-  // ==========================================
 
   if (!Number.isFinite(fare) || fare <= 0) {
-
-    console.log(
-      "⚠️ BACKEND FARE NOT AVAILABLE"
-    );
-
-    console.log(
-      "⚠️ USING TEMPORARY RANDOM FARE"
-    );
-
-    // Random fare between ₹300 and ₹1200
-    const minFare = 300;
-    const maxFare = 1200;
-
-    fare =
-      Math.floor(
-        Math.random() *
-          (maxFare - minFare + 1)
-      ) + minFare;
-
-    console.log(
-      "💰 TEMPORARY FARE:",
-      `₹${fare}`
+    throw new Error(
+      "Fare service did not return a valid amount. Enter an approved fare before creating the ride."
     );
   }
 
-  // ==========================================
-  // 5. DISTANCE FALLBACK
-  // ==========================================
-
-  if (
-    !Number.isFinite(distance) ||
-    distance <= 0
-  ) {
-
-    console.log(
-      "⚠️ BACKEND DISTANCE NOT AVAILABLE"
-    );
-
-    // Don't invent distance if your UI doesn't
-    // actually need it.
-    distance = null;
-  }
-
-  // ==========================================
-  // FINAL RESULT
-  // ==========================================
-
-  console.log(
-    "=========================================="
-  );
-
-  console.log(
-    "💰 FINAL FARE:",
-    `₹${fare}`
-  );
-
-  console.log(
-    "📏 DISTANCE:",
-    distance
-      ? `${distance} km`
-      : "Not available"
-  );
-
-  console.log(
-    "=========================================="
-  );
-
-  return {
-    ...response,
-
-    data: {
-      raw,
-
-      fare,
-
-      distance,
-    },
-  };
+  if (!Number.isFinite(distance) || distance <= 0) distance = null;
+  return { ...response, data: { raw, fare, distance } };
 };
 
 // ==========================================
