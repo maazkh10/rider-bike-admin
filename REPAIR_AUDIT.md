@@ -35,3 +35,12 @@ The two applications remain separate projects and must be built/released separat
 ## Validation still required
 
 No physical-device build, deployed-backend end-to-end ride, background push delivery, or Razorpay sandbox transaction was executed during repository review. Do not merge/release as production-ready until those tests pass.
+
+
+## Revised backend document findings (26 October 2026)
+
+The updated API reference does document `PUT /ride/paymentCompleted?rideId={rideId}&paymentCompleted=COMPLETED`. This is a payment-status persistence endpoint, **not a complete Razorpay integration**. The same reference says it lacks endpoint role/ownership checks, does not verify provider payment status/body, and can update any ride. It also says the `RIDE_DETAILS.PAYMENT_COMPLETED` and `RIDE_DETAILS.PAYMENT_JSON` columns have no migration file. Do not call it from the app as proof of payment.
+
+The reference does not provide Razorpay order-create, signature-verification, webhook, or payment-status endpoint contracts. See `PAYMENT_BACKEND_HANDOFF.md` in the Rider repository for the exact backend work list. Checkout remains intentionally blocked until the backend provides these verified endpoints.
+
+The document also describes WebSocket destinations, but does not document remote push-token registration or Expo/FCM push delivery. WebSocket/local notifications do not meet the requirement for notifications when the app is killed. A backend push-delivery path and physical-device tests remain release blockers.
