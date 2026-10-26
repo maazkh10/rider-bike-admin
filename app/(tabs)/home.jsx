@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as Location from "expo-location";
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -10,11 +11,13 @@ import {
   View,
 } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 
 import FromToInput from "../components/FromToInput";
 import { getAdminProfileApi, getActiveRideApi, getAdminRidesApi } from "../../src/api/ride.api";
 import { getLocationName } from "../../src/services/location-service";
+import { connectAdminRideSocket, disconnectAdminRideSocket } from "../../src/services/adminRideSocket";
+import { showAdminNotification } from "../../src/services/notifications";
 
 export default function Home() {
   const router = useRouter();
