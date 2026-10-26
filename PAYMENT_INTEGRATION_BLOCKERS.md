@@ -1,9 +1,14 @@
-# In-process repair constraints
+# Payment integration status — updated from backend API reference
 
-We must not commit a client-only Razorpay simulation as if it were real payment. The existing backend implementation is not included in either repository and the currently supplied API notes do not define Razorpay order/payment verification endpoints. Before wiring a new payment client, get the backend route contract and expected payment timing.
+The updated backend reference documents `PUT /ride/paymentCompleted?rideId={rideId}&paymentCompleted=COMPLETED`. It records payment data and broadcasts a `PAYMENT_COMPLETED` WebSocket event, but the document explicitly says it has no role/ownership check, does not validate payment status/body, and can update any existing ride.
 
-Immediate safe client changes:
-- remove random fare fallback; fail closed when fare is unavailable.
-- stop payment processing screen from unconditionally routing to success.
-- ensure payment success only renders when it receives a verified server-backed payment result; no hardcoded payment IDs.
-- avoid logging auth or push tokens.
+The document also says the required `RIDE_DETAILS.PAYMENT_COMPLETED` and `RIDE_DETAILS.PAYMENT_JSON` columns do not yet have a migration file. It does **not** document Razorpay order creation, server-side signature verification, or a Razorpay webhook.
+
+Therefore:
+- Do not use this endpoint as proof that a customer paid.
+- Do not report a payment as successful from a client-side flag or SDK callback alone.
+- The customer pays after the ride is completed; the backend must verify the payment and update the ride/invoice state authoritatively.
+- Keep payment status display pending until a verified backend result is available.
+- Never store the Razorpay Key Secret in either mobile app.
+
+The Rider repository contains the detailed backend handoff checklist in `PAYMENT_BACKEND_HANDOFF.md`.
