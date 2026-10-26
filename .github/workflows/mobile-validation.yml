@@ -1,0 +1,48 @@
+name: Admin app validation
+
+on:
+  push:
+    branches:
+      - repair/ride-lifecycle-notifications-payments
+  pull_request:
+    branches:
+      - repair/ride-lifecycle-notifications-payments
+  workflow_dispatch:
+
+jobs:
+  validate-android-ios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Validate Expo config
+        run: npx expo config --type public
+        env:
+          EXPO_PUBLIC_API_URL: https://rider-booking-app.onrender.com
+          EXPO_PUBLIC_ALLOW_DEV_JWT_LOGIN: "false"
+      - name: Bundle Admin Android app
+        run: npx expo export --platform android --output-dir dist/android
+        env:
+          EXPO_PUBLIC_API_URL: https://rider-booking-app.onrender.com
+          EXPO_PUBLIC_ALLOW_DEV_JWT_LOGIN: "false"
+      - name: Bundle Admin iOS app
+        run: npx expo export --platform ios --output-dir dist/ios
+        env:
+          EXPO_PUBLIC_API_URL: https://rider-booking-app.onrender.com
+          EXPO_PUBLIC_ALLOW_DEV_JWT_LOGIN: "false"
+      - name: Upload JS bundle outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-android-ios-js-bundles
+          path: dist
+          if-no-files-found: ignore
+          retention-days: 3
