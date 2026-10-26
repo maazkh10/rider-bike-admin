@@ -1,31 +1,37 @@
-# Ride lifecycle and payments repair — initial audit
+# Ride lifecycle and payments repair — updated audit
 
-## Scope
+## Separate app repositories and release targets
 
-Branches created from `main`:
-- Rider: `repair/ride-lifecycle-notifications-payments`
-- Admin: `repair/ride-lifecycle-notifications-payments`
+- Rider app repository: `maazkh10/rider-bike-rider`
+- Admin app repository: `maazkh10/rider-bike-admin`
+- Both repair branches: `repair/ride-lifecycle-notifications-payments`
+- Rider distribution target: Google Play Store (Android only)
+- Admin distribution target: Apple App Store and Google Play Store (iOS and Android)
+- Payment requirement: customer pays after ride completion.
+- Notification requirement: rider should receive ride notifications while app is open, backgrounded, and closed.
 
-Main has not been changed.
+The two applications remain separate projects and must be built/released separately. Their app identifiers are already distinct: `com.bikerider.rider` and `com.bikerider.admin`.
 
 ## Confirmed code-level findings
 
-1. The rider app registers an Expo push token and saves it in AsyncStorage, but the current documented backend has no endpoint to register/store that token and no push-delivery service. Thus connected foreground STOMP notifications are possible, but guaranteed notifications after the app is backgrounded/killed require backend support and an Android/iOS development build.
-2. Admin ride creation currently sends the ride request through `POST /ride/request`, while rider acceptance uses `POST /ride/accept`. The mobile flow depends on the deployed backend correctly creating/publishing per-rider request events.
-3. Admin `src/api/ride.api.js` contains a temporary random fare fallback (₹300–₹1200) despite its comments elsewhere saying the placeholder fare endpoint must not produce random production fares. This can charge an arbitrary amount and should be removed before payment is enabled.
-4. Rider payment summary is fully dummy/static (example delivery and ₹204 total); processing navigates to success after 3 seconds without contacting Razorpay; success screen displays dummy payment/order IDs. This is not real payment integration and must not be treated as paid.
-5. Admin ride monitor listens for the private STOMP destination `/user/queue/ride/{rideId}/location` and ride events on `/topic/user/{adminId}`; these destinations must be confirmed against the actual backend configuration.
-6. Existing implementation reports explicitly state they did not perform physical-device or deployed-backend end-to-end tests. The live backend and Razorpay account must be tested by the project owner in test mode; no production payment should be triggered during validation.
+1. Rider app can generate and locally store an Expo push token in a supported development/standalone build. The backend reference does not document a token-registration endpoint or remote push delivery, so a token alone does not provide background/killed-app notifications.
+2. Admin ride creation calls `POST /ride/request`; rider acceptance calls `POST /ride/accept`. These routes and event publication need a live end-to-end test against the deployed Spring backend.
+3. The admin random fare fallback has been removed on the repair branch. If the backend fare endpoint does not return a valid positive fare, the client now fails closed rather than inventing a price.
+4. Rider payment screens no longer fabricate a successful payment, payment/order IDs, or a sample payable amount. Real Razorpay checkout is not implemented yet.
+5. Admin ride monitor uses `/topic/user/{adminId}` for ride events and `/user/queue/ride/{rideId}/location` for private live location updates. Confirm the live backend authorizes and publishes to these destinations.
+6. Repository comparison confirms the rider repair branch is 9 commits ahead of its own `main`, and the admin repair branch is 6 commits ahead of its own `main`; neither branch is behind. No automated GitHub Actions test runs were found for these commits.
 
 ## Required backend/deployment work
 
-- Add authenticated push-token registration and secure storage for rider devices.
-- Publish Expo/FCM/APNs push events on new rider assignment, cancellation, and lifecycle state changes.
-- Verify transactional rider matching and single-winner acceptance to prevent two riders accepting the same ride.
-- Add server-created Razorpay orders and server-side payment signature verification/webhook reconciliation. Never expose Razorpay secret keys in either Expo app.
-- Define when the payment is captured (before ride request vs after completion), refund/cancellation rules, and who pays (customer/admin).
-- Harden dev `/sendJWT` path and authorization according to the existing readiness notes before production.
+- Share/access the backend repository to implement and test missing server features; the two mobile repositories do not contain the Spring backend source.
+- Add authenticated device push-token registration, storage, and Expo push delivery for new ride assignment and ride lifecycle changes. Test Android and iOS; do not treat local notifications as remote push delivery.
+- Verify ride matching and single-winner acceptance on the server so two riders cannot accept the same ride.
+- Implement server-created Razorpay orders and server-side signature verification plus webhook reconciliation. Capture/confirm the customer payment after ride completion as required, and define failure, cancellation, refund, and duplicate-webhook behavior.
+- Ensure the payable amount is calculated and validated by the server, not trusted from client parameters.
+- Never expose Razorpay key secrets in the rider/admin app or any `EXPO_PUBLIC_*` variable.
+- Confirm the EAS project ID for each app, configure store signing/build credentials, and use separate Android-only production builds for the rider and iOS+Android builds for admin.
+- Review authentication and the development `/sendJWT` path before production release.
 
-## Validation limits
+## Validation still required
 
-Repository code and route wiring were inspected through GitHub. This environment did not run the Expo applications on physical devices, confirm the deployed Spring backend's live WebSocket messages, or make a Razorpay transaction. These remain required acceptance tests before claiming production readiness.
+No physical-device build, deployed-backend end-to-end ride, background push delivery, or Razorpay sandbox transaction was executed during repository review. Do not merge/release as production-ready until those tests pass.
