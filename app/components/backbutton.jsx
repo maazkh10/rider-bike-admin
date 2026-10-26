@@ -3,33 +3,15 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, TouchableOpacity } from "react-native";
 
-const Backbutton = () => {
+export default function Backbutton({ fallback = "/(tabs)/home" }) {
   const router = useRouter();
-
-  const handleback = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace("/home");
-    }
-  };
-
+  const handleBack = () => router.canGoBack() ? router.back() : router.replace(fallback);
   return (
-    <TouchableOpacity onPress={handleback} style={styles.backBtn}>
-      <Ionicons name="chevron-back" size={24} color="#fff" />
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" activeOpacity={0.8} onPress={handleBack} style={styles.backBtn}>
+      <Ionicons name="chevron-back" size={24} color="#111" />
     </TouchableOpacity>
   );
-};
-
-export default Backbutton;
-
+}
 const styles = StyleSheet.create({
-  backBtn: {
-    backgroundColor: "#000",
-    width: 35,
-    height: 40,
-    justifyContent: "center",
-    marginBottom: 16,
-    alignItems: "center",
-  },
+  backBtn: { backgroundColor: "#BBFF5B", width: 42, height: 42, borderRadius: 14, justifyContent: "center", marginBottom: 14, alignItems: "center" },
 });
