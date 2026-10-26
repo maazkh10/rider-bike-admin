@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { getAuthToken } from "../src/api/auth.api";
-import { getActiveRideApi } from "../src/api/ride.api";
+import { getActiveRideApi, getAdminRidesApi } from "../src/api/ride.api";
 import { connectAdminRideSocket, disconnectAdminRideSocket } from "../src/services/adminRideSocket";
 import { getLocationName } from "../src/services/location-service";
 import { showAdminNotification } from "../src/services/notifications";
@@ -99,7 +99,21 @@ export default function RideMonitor() {
           const type = String(event?.type || event?.eventType || event?.event || "").toUpperCase();
           if (type === "RIDE_ACCEPTED") { await showAdminNotification("Rider accepted", "Your rider has accepted the delivery."); await loadActiveRide(); }
           else if (type === "RIDE_STARTED") { await showAdminNotification("Ride started", "The rider has verified the start OTP and is on trip."); await loadActiveRide(); }
-          else if (type === "RIDE_COMPLETED") { await showAdminNotification("Ride completed", "The delivery has been completed."); await loadActiveRide(); }
+          else if (type === "RIDE_COMPLETED") {
+            await showAdminNotification("Ride completed", `Ride #${event?.rideId ?? ride?.rideId ?? requestedRideId} has been completed by the rider.`, { rideId: event?.rideId ?? ride?.rideId ?? requestedRideId, type });
+            await loadActiveRide();
+            // The completed ride may no longer be returned from /active-ride.
+            // Reflect the authoritative event immediately, then hydrate the row from ride history.
+            setRide((current) => current ? { ...current, rideStatus: "COMPLETED" } : current);
+            try {
+              const response = await getAdminRidesApi();
+              const rows = Array.isArray(response?.data) ? response.data : [];
+              const completedRide = rows.find((item) => String(item.rideId) === String(event?.rideId ?? ride?.rideId ?? requestedRideId));
+              if (completedRide) setRide(completedRide);
+            } catch (refreshError) {
+              if (__DEV__) console.log("Completed ride refresh:", refreshError?.response?.data || refreshError?.message);
+            }
+          }
           else if (type === "RIDE_CANCELLED" || type === "RIDER_CANCELLED" || type === "RIDE_RIDER_CANCELLED") { await showAdminNotification("Rider cancelled", "The assigned rider cancelled this delivery."); await loadActiveRide(); }
         },
       });

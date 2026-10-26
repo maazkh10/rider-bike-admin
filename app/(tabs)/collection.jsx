@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { getAdminRidesApi } from "../../src/api/ride.api";
+import Backbutton from "../components/backbutton";
 
 export default function Collection() {
   const [rides, setRides] = useState([]);
@@ -64,6 +65,7 @@ export default function Collection() {
 
   return (
     <View style={styles.root}>
+      <Backbutton />
       <Text style={styles.title}>Ride Collection</Text>
       <Text style={styles.subtitle}>Vehicles recorded in RIDE_DETAILS</Text>
 

@@ -11,6 +11,7 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { getAdminProfileApi, getAdminRidesApi, getAdminInvoicesApi } from "../../src/api/ride.api";
 import { clearAuthToken } from "../../src/services/authToken";
+import Backbutton from "../components/backbutton";
 
 export default function Profile() {
   const router = useRouter();
@@ -85,6 +86,7 @@ export default function Profile() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       contentContainerStyle={styles.container}
     >
+      <Backbutton />
       <Text style={styles.title}>Admin Profile</Text>
 
       <View style={styles.profile}>
