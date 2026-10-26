@@ -100,7 +100,7 @@ export default function RideMonitor() {
           if (type === "RIDE_ACCEPTED") { await showAdminNotification("Rider accepted", "Your rider has accepted the delivery."); await loadActiveRide(); }
           else if (type === "RIDE_STARTED") { await showAdminNotification("Ride started", "The rider has verified the start OTP and is on trip."); await loadActiveRide(); }
           else if (type === "RIDE_COMPLETED") { await showAdminNotification("Ride completed", "The delivery has been completed."); await loadActiveRide(); }
-          else if (type === "RIDER_CANCELLED") { await showAdminNotification("Rider cancelled", "The assigned rider cancelled this delivery."); await loadActiveRide(); }
+          else if (type === "RIDE_CANCELLED" || type === "RIDER_CANCELLED" || type === "RIDE_RIDER_CANCELLED") { await showAdminNotification("Rider cancelled", "The assigned rider cancelled this delivery."); await loadActiveRide(); }
         },
       });
     };
