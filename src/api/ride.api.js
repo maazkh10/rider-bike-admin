@@ -196,33 +196,12 @@ export const calculateFareApi = async ({
     );
   }
 
-  // ==========================================
-  // 4. TEMPORARY RANDOM FARE FALLBACK
-  // ==========================================
-
+  // A production ride must never be priced using a random client-side fallback.
+  // The backend fare endpoint is documented as a placeholder; require a valid
+  // fare from the server or let the UI ask for an approved amount.
   if (!Number.isFinite(fare) || fare <= 0) {
-
-    console.log(
-      "⚠️ BACKEND FARE NOT AVAILABLE"
-    );
-
-    console.log(
-      "⚠️ USING TEMPORARY RANDOM FARE"
-    );
-
-    // Random fare between ₹300 and ₹1200
-    const minFare = 300;
-    const maxFare = 1200;
-
-    fare =
-      Math.floor(
-        Math.random() *
-          (maxFare - minFare + 1)
-      ) + minFare;
-
-    console.log(
-      "💰 TEMPORARY FARE:",
-      `₹${fare}`
+    throw new Error(
+      "The fare service did not return a valid amount. Please enter an approved fare before creating this ride."
     );
   }
 
