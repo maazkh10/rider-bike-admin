@@ -1,4 +1,5 @@
 import api from "./client";
+export { getAuthToken } from "../services/authToken";
 
 // ==========================================
 // REGISTER
@@ -54,23 +55,7 @@ export const loginApi = async (data) => {
     throw new Error("Username and password are required.");
   }
 
-  try {
-    return await api.post("/login", { username, password });
-  } catch (error) {
-    // The reference documents that the deployed SecurityConfig currently
-    // protects /login and returns 403 before the controller. For that
-    // deployed state, the reference uses /sendJWT for the test flow.
-    if (
-      error?.response?.status === 403 &&
-      process.env.EXPO_PUBLIC_ALLOW_DEV_JWT_LOGIN !== "false"
-    ) {
-      const fallback = await api.get(
-        `/sendJWT?username=${encodeURIComponent(username)}`
-      );
-      return fallback;
-    }
-    throw error;
-  }
+  return api.post("/login", { username, password });
 };
 
 // ==========================================
@@ -81,9 +66,7 @@ export const confirmTokenApi = async (
   email,
   otp
 ) => {
-  return api.get(
-    `/register/confirmToken?token=${encodeURIComponent(String(otp).trim())}`
-  );
+  return api.post("/register/confirmToken", { email: String(email).trim(), otp: String(otp).trim() });
 };
 
 // ==========================================
@@ -93,11 +76,7 @@ export const confirmTokenApi = async (
 export const verifyEmailApi = async (
   email
 ) => {
-  return api.get(
-    `/register/verifyEmail?emailAddress=${encodeURIComponent(
-      email
-    )}`
-  );
+  return api.post("/register/verifyEmail", { emailAddress: String(email).trim() });
 };
 
 // ==========================================

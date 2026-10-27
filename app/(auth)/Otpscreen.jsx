@@ -178,10 +178,6 @@ const Otpscreen = () => {
         email
       );
 
-      console.log(
-        "🔢 OTP:",
-        otpCode
-      );
 
       console.log(
         "👤 USERNAME:",
@@ -212,13 +208,6 @@ const Otpscreen = () => {
         "✅ OTP VERIFICATION RESPONSE"
       );
 
-      console.log(
-        JSON.stringify(
-          response?.data,
-          null,
-          2
-        )
-      );
 
       console.log(
         "=========================================="
@@ -247,7 +236,6 @@ const Otpscreen = () => {
 
       if (jwtToken) {
         await setAuthToken(jwtToken);
-        await AsyncStorage.setItem("token", jwtToken);
         console.log("✅ JWT TOKEN SAVED");
       } else {
 

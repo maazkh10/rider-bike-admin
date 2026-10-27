@@ -118,14 +118,14 @@ export default function Profile() {
         <Text style={styles.linkText}>Open delivery inventory</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
+      {profile?.operationsAccess && <TouchableOpacity
         style={[styles.link, { backgroundColor: "#EAFAD5" }]}
         onPress={() => router.push("/management/rider-verification")}
       >
         <Text style={[styles.linkText, { color: "#315400" }]}>
           Verify a rider
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity>}
 
       <TouchableOpacity style={styles.logout} onPress={logout}>
         <Text style={styles.logoutText}>Log out</Text>

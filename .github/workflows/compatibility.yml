@@ -1,0 +1,17 @@
+name: Frontend compatibility
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node --test scripts/api-contract.test.cjs
+      - run: npx expo export --platform android --output-dir dist-production
+        env:
+          CI: '1'
+          EXPO_NO_TELEMETRY: '1'

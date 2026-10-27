@@ -134,13 +134,6 @@ const Login = () => {
       console.log(
         "✅ LOGIN RESPONSE"
       );
-      console.log(
-        JSON.stringify(
-          data,
-          null,
-          2
-        )
-      );
       console.log("==================================");
 
       // ==========================================
@@ -175,13 +168,6 @@ const Login = () => {
 
       await setAuthToken(token);
 
-      // Also save directly to AsyncStorage
-      // so the API interceptor can use it.
-
-      await AsyncStorage.setItem(
-        "token",
-        token
-      );
 
       console.log(
         "✅ TOKEN SAVED"

@@ -108,7 +108,7 @@ export default function BottomPopup({ visible, onClose, from, to }) {
     } catch (e) {
       setError(
         e?.response?.data?.message ||
-          "Fare service is unavailable. Enter the approved fare manually."
+          "Fare service is unavailable. Please retry before booking."
       );
     } finally {
       setCalculating(false);
@@ -123,7 +123,7 @@ export default function BottomPopup({ visible, onClose, from, to }) {
 
     const numericFare = Number(fare);
     if (!Number.isFinite(numericFare) || numericFare <= 0) {
-      return setError("Enter a valid approved fare.");
+      return setError("Calculate a valid server quote before booking.");
     }
 
     try {
@@ -212,8 +212,8 @@ export default function BottomPopup({ visible, onClose, from, to }) {
 
           <TextInput
             value={fare}
-            onChangeText={setFare}
-            placeholder="Enter approved fare"
+            editable={false}
+            placeholder="Calculate fare above"
             keyboardType="decimal-pad"
             style={styles.input}
           />

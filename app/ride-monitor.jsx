@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { getAuthToken } from "../src/api/auth.api";
-import { getActiveRideApi, getAdminRidesApi } from "../src/api/ride.api";
+import { getActiveRideApi, getAdminRidesApi, openRidePaymentApi } from "../src/api/ride.api";
 import { connectAdminRideSocket, disconnectAdminRideSocket } from "../src/services/adminRideSocket";
 import { getLocationName } from "../src/services/location-service";
 import { showAdminNotification } from "../src/services/notifications";
@@ -12,6 +12,7 @@ import { showAdminNotification } from "../src/services/notifications";
 const statusText = (status) => ({
   REQUESTED: "Finding rider",
   ACCEPTED: "Rider accepted",
+  AWAITING_PAYMENT: "Payment required to start",
   STARTED: "Ride in progress",
   COMPLETED: "Completed",
   ADMIN_CANCELLED: "Cancelled",
@@ -30,6 +31,12 @@ export default function RideMonitor() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState("");
+  const [paying, setPaying] = useState(false);
+  const payForRide = async () => {
+    try { setPaying(true); await openRidePaymentApi(ride.rideId); await loadActiveRide(); }
+    catch (e) { Alert.alert("Unable to open payment", e?.response?.data?.message || e?.message || "Please retry."); }
+    finally { setPaying(false); }
+  };
 
   const loadActiveRide = useCallback(async () => {
     try {
@@ -98,7 +105,8 @@ export default function RideMonitor() {
         onRideEvent: async (event) => {
           const type = String(event?.type || event?.eventType || event?.event || "").toUpperCase();
           if (type === "RIDE_ACCEPTED") { await showAdminNotification("Rider accepted", "Your rider has accepted the delivery."); await loadActiveRide(); }
-          else if (type === "RIDE_STARTED") { await showAdminNotification("Ride started", "The rider has verified the start OTP and is on trip."); await loadActiveRide(); }
+          else if (type === "PAYMENT_REQUIRED") { await loadActiveRide(); }
+          else if (type === "RIDE_STARTED") { await showAdminNotification("Ride started", "Payment is confirmed and the rider is on trip."); await loadActiveRide(); }
           else if (type === "RIDE_COMPLETED") {
             await showAdminNotification("Ride completed", `Ride #${event?.rideId ?? ride?.rideId ?? requestedRideId} has been completed by the rider.`, { rideId: event?.rideId ?? ride?.rideId ?? requestedRideId, type });
             await loadActiveRide();
@@ -198,6 +206,7 @@ export default function RideMonitor() {
         </View>
 
         {ride.rideStatus === "ACCEPTED" && rideOtp ? <View style={styles.otpCard}><Text style={styles.otpLabel}>START OTP — TELL THE RIDER WHEN THEY ARRIVE</Text><Text style={styles.otp}>{rideOtp}</Text></View> : null}
+        {ride.rideStatus === "AWAITING_PAYMENT" ? <TouchableOpacity style={styles.navButton} onPress={payForRide} disabled={paying}><Text style={styles.navText}>{paying ? "Opening payment..." : "Pay securely to start ride"}</Text></TouchableOpacity> : null}
         {ride.rideStatus === "STARTED" ? <View style={styles.startedCard}><Ionicons name="navigate" size={20} color="#111" /><Text style={styles.startedText}>Rider is on the way to destination</Text></View> : null}
         {lastUpdated ? <Text style={styles.updated}>Location updated {lastUpdated.toLocaleTimeString()}</Text> : null}
 

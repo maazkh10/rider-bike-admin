@@ -1,5 +1,35 @@
 import { getAuthToken } from "../services/authToken";
 import api from "./client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const inFlightBookings = new Map();
+export const createRideApi = (payload, ...args) => {
+  const fingerprint = JSON.stringify(payload);
+  if (inFlightBookings.has(fingerprint)) return inFlightBookings.get(fingerprint);
+  const request = (async () => {
+    const token = args[0] || await getAuthToken();
+    const profile = await getAdminProfileApi(token);
+    const storageKey = `pendingBooking:${profile.data.userId}`;
+    const previous = JSON.parse(await AsyncStorage.getItem(storageKey) || "null");
+    const key = previous?.fingerprint === fingerprint ? previous.key : `booking_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    await AsyncStorage.setItem(storageKey, JSON.stringify({ fingerprint, key }));
+    const response = await createRideRequest({ ...payload, idempotencyKey: key }, token);
+    await AsyncStorage.removeItem(storageKey);
+    return response;
+  })();
+  inFlightBookings.set(fingerprint, request);
+  request.finally(() => inFlightBookings.delete(fingerprint)).catch(() => {});
+  return request;
+};
+
+export const openRidePaymentApi = async (rideId) => {
+  const response = await api.post(`/api/payments/rides/${Number(rideId)}/checkout-session`, {});
+  const url = new URL(response.data.checkoutUrl);
+  const base = new URL(api.defaults.baseURL);
+  if (url.origin !== base.origin || url.pathname !== "/payment-checkout.html") throw new Error("Unexpected checkout address.");
+  const browser = await import("expo-web-browser");
+  return browser.openBrowserAsync(url.toString());
+};
 
 // ==========================================
 // AUTH CONFIG
@@ -124,9 +154,7 @@ export const getNearbyRidersApi = async (
 // ==========================================
 // CALCULATE FARE
 // ==========================================
-// Never invent production prices with a random fallback. The backend currently
-// documents this endpoint as a placeholder, so stop and require an approved
-// server fare or a manually approved fare before the ride is created.
+// The server quote uses integer paise and meters; screens display rupees and km.
 export const calculateFareApi = async ({
   startLatitude,
   startLongitude,
@@ -154,15 +182,15 @@ export const calculateFareApi = async ({
     if (fareMatch) fare = Number(fareMatch[1]);
     if (distanceMatch) distance = Number(distanceMatch[1]);
   } else if (raw && typeof raw === "object") {
-    const candidate = raw.fare ?? raw.totalFare ?? raw.amount ?? raw.estimatedFare;
+    const candidate = raw.amountPaise != null ? Number(raw.amountPaise) / 100 : raw.fare ?? raw.totalFare ?? raw.amount ?? raw.estimatedFare;
     fare = candidate == null ? null : Number(candidate);
-    const distanceCandidate = raw.distance ?? raw.distanceKm ?? raw.distanceInKm;
+    const distanceCandidate = raw.distanceMeters != null ? Number(raw.distanceMeters) / 1000 : raw.distance ?? raw.distanceKm ?? raw.distanceInKm;
     distance = distanceCandidate == null ? null : Number(distanceCandidate);
   }
 
   if (!Number.isFinite(fare) || fare <= 0) {
     throw new Error(
-      "Fare service did not return a valid amount. Enter an approved fare before creating the ride."
+      "Fare service did not return a valid quote. Please calculate again before booking."
     );
   }
 
@@ -191,7 +219,7 @@ export const calculateFareApi = async ({
 //
 // ==========================================
 
-export const createRideApi = async (
+const createRideRequest = async (
   ridePayload,
   token
 ) => {
@@ -407,6 +435,7 @@ export const createRideApi = async (
         payload,
         {
           headers: {
+            "Idempotency-Key": ridePayload.idempotencyKey,
             Authorization:
               `Bearer ${token}`,
 
