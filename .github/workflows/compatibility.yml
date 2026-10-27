@@ -10,8 +10,13 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: node --test scripts/api-contract.test.cjs
+      - run: node --test scripts/*.test.cjs
+      - run: npm audit --audit-level=high
       - run: npx expo export --platform android --output-dir dist-production
+        env:
+          CI: '1'
+          EXPO_NO_TELEMETRY: '1'
+      - run: npx expo export --platform ios --output-dir dist-production-ios
         env:
           CI: '1'
           EXPO_NO_TELEMETRY: '1'

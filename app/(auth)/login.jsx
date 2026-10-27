@@ -503,9 +503,7 @@ const Login = () => {
             style={styles.forgot}
             disabled={loading}
             onPress={() =>
-              navigation.navigate(
-                "forgotpassword"
-              )
+              router.push("/(auth)/ForgotpasswordMail")
             }
           >
             <Text

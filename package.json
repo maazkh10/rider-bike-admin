@@ -11,6 +11,10 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "image-size": "file:vendor/image-size",
+    "safe-image-size": "npm:image-size@2.0.4",
+    "safe-uri-decoder": "npm:decode-uri-component@0.5.1",
+    "decode-uri-component": "file:vendor/decode-uri-component",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
@@ -25,6 +29,7 @@
     "expo": "~54.0.32",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",
+    "expo-crypto": "~15.0.9",
     "expo-font": "~14.0.11",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
@@ -67,6 +72,13 @@
     "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"
   },
-  "overrides": { "expo": "$expo" },
+  "overrides": {
+    "expo": "$expo",
+    "postcss": "8.5.32",
+    "image-size": "$image-size",
+    "brace-expansion@^1.1.7": "1.1.21",
+    "brace-expansion@>=4 <6": "5.0.12",
+    "decode-uri-component": "$decode-uri-component"
+  },
   "private": true
 }

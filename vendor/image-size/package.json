@@ -1,0 +1,1 @@
+{"name":"image-size","version":"2.0.4-compat.1","main":"index.cjs","license":"MIT","dependencies":{"safe-image-size":"npm:image-size@2.0.4"}}
