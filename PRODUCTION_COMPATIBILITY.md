@@ -1,5 +1,7 @@
 # Backend production compatibility
 
+Push completion hardening is on codex/push-notification-completion. Code-level checks pass, but physical iPhone delivery and completion-screen acceptance remain pending. The matching backend report is docs/PUSH_INTEGRATION_VERIFICATION.md on that branch. Do not enable delivery against the older working backend.
+
 Branch `ariyaan-changes` is based on the latest `feature/ride-end-otp-back-buttons` commit `1a0cfc9`.
 Pair this app with backend `ariyaanshaikh/Rider-Booking-App:production-changes`.
 

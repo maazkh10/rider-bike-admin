@@ -4,6 +4,8 @@
 node_modules/
 dist-production/
 dist-production-ios/
+dist-push-android/
+dist-push-ios/
 
 # Expo
 .expo/

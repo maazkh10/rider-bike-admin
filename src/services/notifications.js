@@ -1,10 +1,12 @@
 import { AppState } from "react-native";
-import { getPushNotifications, syncPushDevice } from "./pushClient";
+import { claimRideNotification, getPushNotifications, syncPushDevice } from "./pushClient";
 export const registerForNotifications = () => syncPushDevice();
 export const showAdminNotification = async (title, body, data = {}) => {
   if (AppState.currentState !== "active") return;
   try {
     const notifications = await getPushNotifications();
-    await notifications?.scheduleNotificationAsync({ content: { title, body, data }, trigger: null });
+    if (!notifications || !claimRideNotification(data)) return;
+    const safeData = { type: data.type, rideId: data.rideId, eventId: data.eventId };
+    await notifications.scheduleNotificationAsync({ content: { title, body, data: safeData }, trigger: null });
   } catch {}
 };

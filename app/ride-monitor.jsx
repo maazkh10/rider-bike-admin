@@ -1,13 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, AppState, Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { getAuthToken } from "../src/api/auth.api";
 import { getActiveRideApi, getAdminRidesApi, openRidePaymentApi } from "../src/api/ride.api";
 import { connectAdminRideSocket, disconnectAdminRideSocket } from "../src/services/adminRideSocket";
 import { getLocationName } from "../src/services/location-service";
 import { showAdminNotification } from "../src/services/notifications";
+import { resolveMonitoredRide } from "../src/services/rideMonitorState";
+import { subscribeRideNotifications } from "../src/services/pushClient";
 
 const statusText = (status) => ({
   REQUESTED: "Finding rider",
@@ -23,6 +25,7 @@ export default function RideMonitor() {
   const { rideId: requestedRideId } = useLocalSearchParams();
   const mapRef = useRef(null);
   const mounted = useRef(true);
+  const monitoredId = useRef(requestedRideId), refreshSequence = useRef(0);
   const [ride, setRide] = useState(null);
   const [rideOtp, setRideOtp] = useState("");
   const [riderLocation, setRiderLocation] = useState(null);
@@ -39,9 +42,13 @@ export default function RideMonitor() {
   };
 
   const loadActiveRide = useCallback(async () => {
+    const sequence = ++refreshSequence.current;
     try {
       const response = await getActiveRideApi();
-      const active = response?.data?.activeRide;
+      const active = await resolveMonitoredRide(requestedRideId || monitoredId.current, response?.data?.activeRide, async () => {
+        const history = await getAdminRidesApi();
+        return Array.isArray(history?.data) ? history.data : [];
+      });
       const otp = response?.data?.rideOtp;
 
       if (!active) {
@@ -52,15 +59,17 @@ export default function RideMonitor() {
 
       if (requestedRideId && String(active.rideId) !== String(requestedRideId)) return;
 
-      if (!mounted.current) return;
+      if (!mounted.current || sequence !== refreshSequence.current) return;
+      monitoredId.current = active.rideId;
+      setError("");
       setRide(active);
-      if (otp != null) setRideOtp(String(otp));
+      setRideOtp(active.rideStatus === "ACCEPTED" && otp != null ? String(otp) : "");
 
       const [pickup, drop] = await Promise.all([
         getLocationName(active.pickupLatitude, active.pickupLongitude),
         getLocationName(active.dropLatitude, active.dropLongitude),
       ]);
-      if (mounted.current) {
+      if (mounted.current && sequence === refreshSequence.current) {
         setPickupAddress(pickup || "Pickup location");
         setDropAddress(drop || "Destination");
       }
@@ -71,6 +80,14 @@ export default function RideMonitor() {
     }
   }, [requestedRideId]);
 
+  useEffect(() => {
+    const unsubscribe = subscribeRideNotifications(data => {
+      if (String(data.rideId) === String(requestedRideId || monitoredId.current)) return loadActiveRide();
+    });
+    const active = AppState.addEventListener("change", state => { if (state === "active") void loadActiveRide(); });
+    return () => { unsubscribe(); active.remove(); };
+  }, [loadActiveRide, requestedRideId]);
+
   useFocusEffect(useCallback(() => {
     mounted.current = true;
     loadActiveRide();
@@ -78,13 +95,13 @@ export default function RideMonitor() {
   }, [loadActiveRide]));
 
   useEffect(() => {
-    let timer;
+    let timer, stopped = false;
     const start = async () => {
       await loadActiveRide();
-      timer = setInterval(loadActiveRide, 8000);
+      if (!stopped) timer = setInterval(loadActiveRide, 8000);
     };
     start();
-    return () => clearInterval(timer);
+    return () => { stopped = true; clearInterval(timer); };
   }, [loadActiveRide]);
 
   useEffect(() => {
@@ -103,13 +120,16 @@ export default function RideMonitor() {
           setLastUpdated(new Date());
         },
         onRideEvent: async (event) => {
+          if (cancelled) return;
           const type = String(event?.type || event?.eventType || event?.event || "").toUpperCase();
-          if (type === "RIDE_ACCEPTED") { await showAdminNotification("Rider accepted", "Your rider has accepted the delivery."); await loadActiveRide(); }
+          if (String(event?.rideId) !== String(ride.rideId)) return;
+          if (type === "RIDE_ACCEPTED") { await showAdminNotification("Rider accepted", "Your rider has accepted the delivery.", event); await loadActiveRide(); }
           else if (type === "PAYMENT_REQUIRED") { await loadActiveRide(); }
-          else if (type === "RIDE_STARTED") { await showAdminNotification("Ride started", "Payment is confirmed and the rider is on trip."); await loadActiveRide(); }
+          else if (type === "RIDE_STARTED") { await showAdminNotification("Ride started", "Payment is confirmed and the rider is on trip.", event); await loadActiveRide(); }
           else if (type === "RIDE_COMPLETED") {
-            await showAdminNotification("Ride completed", `Ride #${event?.rideId ?? ride?.rideId ?? requestedRideId} has been completed by the rider.`, { rideId: event?.rideId ?? ride?.rideId ?? requestedRideId, type });
+            await showAdminNotification("Ride Completed", `Ride #${event.rideId} has been completed by the rider.`, event);
             await loadActiveRide();
+            if (cancelled) return;
             // The completed ride may no longer be returned from /active-ride.
             // Reflect the authoritative event immediately, then hydrate the row from ride history.
             setRide((current) => current ? { ...current, rideStatus: "COMPLETED" } : current);
@@ -117,12 +137,12 @@ export default function RideMonitor() {
               const response = await getAdminRidesApi();
               const rows = Array.isArray(response?.data) ? response.data : [];
               const completedRide = rows.find((item) => String(item.rideId) === String(event?.rideId ?? ride?.rideId ?? requestedRideId));
-              if (completedRide) setRide(completedRide);
+              if (completedRide && !cancelled) setRide(completedRide);
             } catch (refreshError) {
               if (__DEV__) console.log("Completed ride refresh:", refreshError?.response?.data || refreshError?.message);
             }
           }
-          else if (type === "RIDE_CANCELLED" || type === "RIDER_CANCELLED" || type === "RIDE_RIDER_CANCELLED") { await showAdminNotification("Rider cancelled", "The assigned rider cancelled this delivery."); await loadActiveRide(); }
+          else if (type === "RIDE_CANCELLED" || type === "RIDER_CANCELLED" || type === "RIDE_RIDER_CANCELLED") { await showAdminNotification("Rider cancelled", "The assigned rider cancelled this delivery.", event); await loadActiveRide(); }
         },
       });
     };
