@@ -10,6 +10,25 @@ const BASE = process.env.EXPO_PUBLIC_API_URL || "https://rider-booking-app.onren
 const INSTALLATION = APP + ".push.installation";
 let modulePromise, inFlight, paused = false, lastRegistration = "", lastAt = 0, onOpen, permissionRequested = false;
 const opened = new Set();
+const displayed = new Set(), rideListeners = new Set();
+export const claimRideNotification = (data = {}) => {
+  if (!data.eventId) return true;
+  const key = String(data.eventId);
+  if (displayed.has(key)) return false;
+  displayed.add(key);
+  if (displayed.size > 200) displayed.delete(displayed.values().next().value);
+  return true;
+};
+export const subscribeRideNotifications = listener => {
+  rideListeners.add(listener);
+  return () => rideListeners.delete(listener);
+};
+const publishRideNotification = data => {
+  if (!data || !Number.isSafeInteger(Number(data.rideId))) return;
+  for (const listener of rideListeners) {
+    try { Promise.resolve(listener(data)).catch(() => {}); } catch {}
+  }
+};
 
 export const getPushNotifications = async () => {
   if (Platform.OS === "web" || Constants.executionEnvironment === "storeClient") return null;
@@ -40,7 +59,8 @@ const handleResponse = async (response) => {
   if (previous.includes(key)) return;
   await AsyncStorage.setItem(APP + ".openedNotifications", JSON.stringify([key, ...previous].slice(0, 100)));
   opened.add(key); if (opened.size > 100) opened.delete(opened.values().next().value);
-  onOpen?.({ ...data, rideId: id });
+  publishRideNotification(data);
+  await onOpen?.({ ...data, rideId: id });
 };
 const pending = async () => {
   const raw = await AsyncStorage.getItem(APP + ".pendingNotification");
@@ -91,14 +111,18 @@ export const startPushLifecycle = async (open) => {
   const notifications = await getPushNotifications();
   if (!notifications) return () => {};
   notifications.setNotificationHandler({ handleNotification: async (notification) => {
-    const show = !notification.request.content.data?.remote || AppState.currentState !== "active";
+    const data = notification.request.content.data || {};
+    const show = !data.remote || claimRideNotification(data);
     return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: show, shouldSetBadge: false };
   } });
-  const response = notifications.addNotificationResponseReceivedListener(value => { void handleResponse(value); });
+  const received = notifications.addNotificationReceivedListener(value => {
+    if (value?.request?.content?.data?.remote) publishRideNotification(value.request.content.data);
+  });
+  const response = notifications.addNotificationResponseReceivedListener(value => { void handleResponse(value).catch(() => {}); });
   const token = notifications.addPushTokenListener(() => { lastRegistration = ""; void syncPushDevice(); });
-  const active = AppState.addEventListener("change", state => { if (state === "active") { void syncPushDevice(); void pending(); } });
+  const active = AppState.addEventListener("change", state => { if (state === "active") { void syncPushDevice(); void pending().catch(() => {}); } });
   const timer = setInterval(() => { if (AppState.currentState === "active") void syncPushDevice(); }, 60000);
-  await handleResponse(await notifications.getLastNotificationResponseAsync());
-  void syncPushDevice(); void pending();
-  return () => { response.remove(); token.remove(); active.remove(); clearInterval(timer); onOpen = null; };
+  try { await handleResponse(await notifications.getLastNotificationResponseAsync()); } catch {}
+  void syncPushDevice(); void pending().catch(() => {});
+  return () => { received.remove(); response.remove(); token.remove(); active.remove(); clearInterval(timer); onOpen = null; };
 };
